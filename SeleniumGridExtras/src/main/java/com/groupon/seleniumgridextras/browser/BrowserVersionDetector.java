@@ -110,11 +110,55 @@ public class BrowserVersionDetector {
       return getIEVersion();
     } else if (browserName.equalsIgnoreCase("internet explorer")) {
       return getIEVersion();
-    } else {
+    } else if (browserName.equalsIgnoreCase("phantomjs")) {
+      return getPhantomJSVersion();
+    }else if (browserName.equalsIgnoreCase("safari")) {
+      return getSafariVersion();
+    }else {
       return "";
     }
   }
-  
+
+  private static String getSafariVersion(){
+    String[] cmd = {"defaults", "read", "com.apple.Safari LastSafariVersionWithWelcomePage"};
+    String version = "";
+    try {
+      JsonObject object = ExecuteCommand.execRuntime(cmd, true);
+      version = version.substring(0, version.indexOf('.'));
+    } catch (Exception e) {
+      // If ExecuteCommand.execRuntime fails, still return "";
+      logger.warn(e.getMessage());
+    }
+    return version;
+  }
+  private static String getPhantomJSVersion() {
+    String version = "";
+    if (RuntimeConfig.getOS().isWindows()) {
+      String[] cmd = new String[2];
+      cmd[0] = "phantomjs";
+      cmd[1] = "-v";
+      try {
+        JsonObject object = ExecuteCommand.execRuntime(cmd, true);
+        version = version.substring(0, version.indexOf('.'));
+      } catch (Exception e) {
+        // If ExecuteCommand.execRuntime fails, still return "";
+        logger.warn(e.getMessage());
+      }
+      return version;
+    } else if (RuntimeConfig.getOS().isMac()) {
+      String[] cmd = {"phantomjs", "-v"};
+      try {
+        JsonObject object = ExecuteCommand.execRuntime(cmd, true);
+        version = version.substring(0, version.indexOf('.'));
+      } catch (Exception e) {
+        // If ExecuteCommand.execRuntime fails, still return "";
+        logger.warn(e.getMessage());
+      }
+      return version;
+    }
+    return version;
+  }
+
   /**
    * 
    * @return version of IE installed
@@ -215,9 +259,10 @@ public class BrowserVersionDetector {
       version = version.substring(0, version.indexOf('.'));
       return version.trim();
     } else if (RuntimeConfig.getOS().isMac()) {
-      String[] cmd = {"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "--version"};
+      String[] cmd = {"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " -version"};
       try {
-        JsonObject object = ExecuteCommand.execRuntime(cmd, true);
+        JsonObject object = ExecuteCommand
+                .execRuntime(cmd, true, true);
         version = object.get("out").getAsString().trim().replaceAll("[^\\d.]", ""); // Removes "Google Chrome"
         version = version.substring(0, version.indexOf('.'));
       } catch (Exception e) {

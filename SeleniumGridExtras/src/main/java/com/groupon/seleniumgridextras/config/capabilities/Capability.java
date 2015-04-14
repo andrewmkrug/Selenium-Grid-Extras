@@ -106,6 +106,7 @@ public abstract class Capability extends HashMap {
     capabilityHash.put(Firefox.class, BrowserType.FIREFOX);
     capabilityHash.put(InternetExplorer.class, BrowserType.IE);
     capabilityHash.put(Chrome.class, BrowserType.CHROME);
+    capabilityHash.put(PhantomJS.class, BrowserType.PHANTOMJS);
     capabilityHash.put(Safari.class, BrowserType.SAFARI);
 
     return capabilityHash;
