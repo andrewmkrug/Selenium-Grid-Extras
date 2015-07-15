@@ -42,11 +42,12 @@ import com.groupon.seleniumgridextras.grid.SelfHealingGrid;
 import com.groupon.seleniumgridextras.homepage.HtmlRenderer;
 import com.groupon.seleniumgridextras.tasks.ExecuteOSTask;
 import com.groupon.seleniumgridextras.tasks.StartGrid;
+import com.groupon.seleniumgridextras.utilities.TempUtility;
 import com.groupon.seleniumgridextras.utilities.json.JsonParserWrapper;
-import com.groupon.seleniumgridextras.videorecording.VideoShutdownHook;
+import com.groupon.seleniumgridextras.utilities.shutdownhooks.CleanTempShutdownHook;
+import com.groupon.seleniumgridextras.utilities.shutdownhooks.VideoShutdownHook;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpServer;
-
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 
@@ -57,7 +58,10 @@ import java.util.Map;
 
 public class SeleniumGridExtras {
 
-    public static final String START_UP_COMPLETE = "\nSelenium Grid Extras has been started!\nNavigate to http://localhost:3000 for more details";
+    public static final String START_UP_COMPLETE = String.format(
+            "\nSelenium Grid Extras has been started!\nNavigate to http://%s:%s for more details",
+            RuntimeConfig.getOS().getHostIp(),
+            RuntimeConfig.getGridExtrasPort());
     private static Logger logger = Logger.getLogger(SeleniumGridExtras.class);
 
     public static void main(String[] args) throws Exception {
@@ -149,8 +153,8 @@ public class SeleniumGridExtras {
         System.out.println(START_UP_COMPLETE);
         logger.info(START_UP_COMPLETE);
 
-        VideoShutdownHook videoShutdownHook = new VideoShutdownHook();
-        videoShutdownHook.attachShutDownHook();
+        new VideoShutdownHook().attachShutDownHook();
+        new CleanTempShutdownHook(TempUtility.getWindowsTempForCurrentUser()).attachShutDownHook();
     }
 }
 

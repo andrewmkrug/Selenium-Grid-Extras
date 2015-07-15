@@ -38,9 +38,7 @@
 package com.groupon.seleniumgridextras;
 
 
-import com.groupon.seleniumgridextras.tasks.ExecuteOSTask;
 import com.groupon.seleniumgridextras.tasks.KillAllIE;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -48,25 +46,47 @@ import static org.junit.Assert.assertEquals;
 
 public class KillAllIETest {
 
-  private ExecuteOSTask task;
-  private String windowsCommand;
+    public static final String TASKKILL_F_T_IM_WER_FAULT = "taskkill -F -T -IM WerFault*";
+    private KillAllIE task;
+    private String expectedIEDriverCommand = "taskkill -F -T -IM iedriver*";
+    private String expectedIECommand = "taskkill -F -T -IM iexplore*";
+    private String expectedHistoryCommand = "RunDll32.exe InetCpl.cpl,ClearMyTracksByProcess 4351";
 
-  @Before
-  public void setUp() throws Exception {
-    task = new KillAllIE();
-    windowsCommand = "taskkill -F -IM iexplore.exe";
-  }
+    @Before
+    public void setUp() throws Exception {
+        task = new KillAllIE();
+    }
 
-  @Test
-  public void testGetDescription() throws Exception {
+    @Test
+    public void testGetDescription() throws Exception {
 
-    assertEquals("Executes os level kill command on all instance of Internet Explorer",
-        task.getDescription());
-  }
+        assertEquals("Executes os level kill command on all instance of Internet Explorer",
+                task.getDescription());
+    }
 
-  @Test
-  public void testGetEndpoint() throws Exception {
-    assertEquals("/kill_ie", task.getEndpoint());
-  }
+    @Test
+    public void testGetEndpoint() throws Exception {
+        assertEquals("/kill_ie", task.getEndpoint());
+    }
+
+    @Test
+    public void testGetKillDriverCommand() throws Exception {
+        assertEquals(expectedIEDriverCommand, task.getKillDriverCommand());
+    }
+
+    @Test
+    public void testGetKillIECommand() throws Exception{
+        assertEquals(expectedIECommand, task.getKillIECommand());
+    }
+
+    @Test
+    public void testGetClearHistoryCommand() throws Exception{
+        assertEquals(expectedHistoryCommand, task.getClearHistoryCommand());
+    }
+
+    @Test
+    public void testGetKillCrashReportCommand() throws Exception{
+        assertEquals(TASKKILL_F_T_IM_WER_FAULT, task.getKillCrashReportCommand());
+    }
 
 }

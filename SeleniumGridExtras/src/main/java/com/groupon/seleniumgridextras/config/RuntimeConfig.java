@@ -56,10 +56,10 @@ import java.util.Map;
 
 public class RuntimeConfig {
 
-  private static String configFile = "selenium_grid_extras_config.json";
+  public static String configFile = "selenium_grid_extras_config.json";
   private static Config config = null;
   private static OS currentOS = new OS();
-  private final static int gridExtrasPort = 3000;
+  public final static int gridExtrasPort = 3000;
   private static Logger logger = Logger.getLogger(RuntimeConfig.class);
   private static WebDriverReleaseManager releaseManager;
   private static SessionTracker sessionTracker;
@@ -71,8 +71,8 @@ public class RuntimeConfig {
   public static WebDriverReleaseManager getReleaseManager() {
     if (releaseManager == null) {
       releaseManager =
-          loadWebDriverReleaseManager("http://selenium-release.storage.googleapis.com/",
-                                      "http://chromedriver.storage.googleapis.com/LATEST_RELEASE");
+          loadWebDriverReleaseManager("https://selenium-release.storage.googleapis.com/",
+                                      "https://chromedriver.storage.googleapis.com/LATEST_RELEASE");
     }
 
     return releaseManager;

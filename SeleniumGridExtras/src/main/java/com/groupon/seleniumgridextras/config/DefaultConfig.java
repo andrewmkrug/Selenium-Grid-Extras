@@ -37,9 +37,9 @@
 package com.groupon.seleniumgridextras.config;
 
 
-import com.groupon.seleniumgridextras.tasks.*;
 import com.groupon.seleniumgridextras.loggers.SessionHistoryLog;
-
+import com.groupon.seleniumgridextras.tasks.*;
+import com.groupon.seleniumgridextras.utilities.ValueConverter;
 import com.groupon.seleniumgridextras.utilities.json.JsonCodec;
 
 import java.io.File;
@@ -50,6 +50,9 @@ public class DefaultConfig {
     public static final String REBOOT_AFTER_THIS_MANY_SESSIONS = "10";
     public static final String DEFAULT_HUB_PORT = "4444";
     public static final String DEFAULT_SHARED_DIRECTORY = "shared";
+
+    public static final String LOG_MAXIMUM_SIZE = "20000000";
+    public static final long LOG_MAX_AGE = ValueConverter.daysToMilliseconds(10);
 
     public static final String BOOTSTRAP_CSS = "/bootstrap.3.2.0.min.css";
     public static final String BOOTSTRAP_JS = "/bootstrap.3.2.0.min.js";
@@ -81,6 +84,7 @@ public class DefaultConfig {
     public static final int CONFIG_PULLER_HTTP_TIMEOUT = 5000;
     public static final File SESSION_LOG_DIRECTORY = new File("log", "session_logs");
     public static final int VIDEOS_TO_KEEP = 40;
+    public static final String DEFAULT_GRID_EXTRAS_RELEASE_URL = "https://api.github.com/repos/groupon/Selenium-Grid-Extras/releases";
     private static Config config;
     private static final String webDriverDefaultVersion = "2.41.0";
     private static final String ieDriverDefaultVersion = "2.41.0";
@@ -103,10 +107,18 @@ public class DefaultConfig {
         loadDefaultVideoRecordingOptions();
         loadHTTPOptions();
         loadHtmlRenderOptions();
+        loadGridExtrasReleaseUrl();
+
+        loadLogConfig();
 
         loadSessionLogDir();
 
         return config;
+    }
+
+    public static void loadGridExtrasReleaseUrl() {
+        config.setGridExtrasReleaseUrl(DEFAULT_GRID_EXTRAS_RELEASE_URL);
+        config.setGridExtrasAutoUpdate(false);
     }
 
     public static void loadSessionLogDir() {
@@ -225,9 +237,14 @@ public class DefaultConfig {
         config.getChromeDriver().setBit(JsonCodec.WebDriver.Downloader.BIT_32);
     }
 
+    private static void loadLogConfig() {
+        config.setLogMaximumSize(LOG_MAXIMUM_SIZE);
+        config.setLogMaximumAge(LOG_MAX_AGE);
+    }
 
     private static void loadEnabledPlugins() {
 
+        config.addActivatedModules(DeleteOldLogsTask.class.getCanonicalName());
         config.addActivatedModules(Setup.class.getCanonicalName());
         config.addActivatedModules(Teardown.class.getCanonicalName());
         config.addActivatedModules(MoveMouse.class.getCanonicalName());
@@ -263,6 +280,8 @@ public class DefaultConfig {
         config.addActivatedModules(DownloadIEDriver.class.getCanonicalName());
         config.addActivatedModules(DownloadChromeDriver.class.getCanonicalName());
         config.addActivatedModules(SessionHistory.class.getCanonicalName());
+
+        config.addActivatedModules(UpgradeGridExtrasTask.class.getCanonicalName());
     }
 
     private static void loadDisabledPlugins() {

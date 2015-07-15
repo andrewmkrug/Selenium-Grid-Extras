@@ -23,6 +23,7 @@ public class TaskDescriptions {
         public static final String KILL_SAFARI = "/kill_safari";
         public static final String KILL_PID = "/kill_pid";
         public static final String MOVE_MOUSE = "/move_mouse";
+        public static final String LOG_DELETE = "/log_delete";
         public static final String NETSTAT = "/netstat";
         public static final String REBOOT = "/reboot";
         public static final String SCREENSHOT = "/screenshot";
@@ -35,6 +36,7 @@ public class TaskDescriptions {
         public static final String UPDATE_NODE_CONFIG = "/update_node_config";
         public static final String VIDEO = "/video";
         public static final String SESSION_HISTORY = "/session_history";
+        public static final String UPGRADE_GRID_EXTRAS = "/upgrade_grid_extras";
     }
 
 
@@ -96,6 +98,7 @@ public class TaskDescriptions {
                 KILL_SAFARI =
                 "Executes os level kill command on all instance of Safari";
         public static final String KILL_PID = "Kills a given process id";
+        public static final String LOG_DELETE = "Delete logs older than X Days. X is define in the config.json";
         public static final
         String
                 MOVE_MOUSE =
@@ -125,6 +128,7 @@ public class TaskDescriptions {
         public static final String VIDEO = "Starts and stops video recording";
         public static final String SESSION_HISTORY = "Displays the threads of test session on all nodes or per node basis";
         public static final String IE_MIXED_CONTENT = "Changes mixed content for Internet Explorer on/off. No param for current status";
+        public static final String UPGRADE_GRID_EXTRAS = "Download specified version of Selenium Grid Extras";
     }
 
     public static class HTTP {

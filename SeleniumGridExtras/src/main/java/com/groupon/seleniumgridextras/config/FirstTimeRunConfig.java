@@ -42,9 +42,11 @@ import com.groupon.seleniumgridextras.config.capabilities.Capability;
 import com.groupon.seleniumgridextras.config.remote.ConfigPusher;
 import com.groupon.seleniumgridextras.downloader.webdriverreleasemanager.WebDriverReleaseManager;
 import com.groupon.seleniumgridextras.os.GridPlatform;
+import com.groupon.seleniumgridextras.tasks.config.TaskDescriptions;
 import com.groupon.seleniumgridextras.utilities.FileIOUtility;
 import com.groupon.seleniumgridextras.OS;
 
+import com.groupon.seleniumgridextras.utilities.ValueConverter;
 import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
@@ -57,476 +59,505 @@ import java.util.Map;
 
 public class FirstTimeRunConfig {
 
-  private static Logger logger = Logger.getLogger(FirstTimeRunConfig.class);
+    private static Logger logger = Logger.getLogger(FirstTimeRunConfig.class);
 
-  public static Config customiseConfig(Config defaultConfig) {
-    final
-    String
-        message =
-        "We noticed this is a first time running, we will ask some configuration settings";
-    logger.info(message);
-    System.out.println("\n\n\n\n" + message + "\n\n");
+    public static Config customiseConfig(Config defaultConfig) {
+        final
+        String
+                message =
+                "We noticed this is a first time running, we will ask some configuration settings";
+        logger.info(message);
+        System.out.println("\n\n\n\n" + message + "\n\n");
 
-    setDefaultService(defaultConfig);
+        setDefaultService(defaultConfig);
 
-    String hubHost = getGridHubHost();
-    String hubPort = getGridHubPort();
+        String hubHost = getGridHubHost();
+        String hubPort = getGridHubPort();
 
-    if (defaultConfig.getDefaultRole().equals("hub")) {
-      configureHub(hubHost, hubPort, defaultConfig);
-    }
-
-    List<Capability> caps = getCapabilitiesFromUser(defaultConfig);
-
-    if (defaultConfig.getAutoStartNode()) {
-      configureNodes(caps, hubHost, hubPort, defaultConfig);
-
-      List<Capability> appiumCaps = getAppiumCapabilitiesFromUser(defaultConfig);
-
-      if (appiumCaps.size() > 0) {
-        String appiumStartCommand = getAppiumStartCommand();
-
-        configureAppiumNodes(appiumCaps, hubHost, hubPort, appiumStartCommand, defaultConfig);
-      }
-    }
-
-    setRebootAfterSessionLimit(defaultConfig);
-
-    setDriverAutoUpdater(defaultConfig);
-
-    if (defaultConfig.getAutoStartNode()) {
-      askToRecordVideo(defaultConfig);
-    }
-
-    final
-    String
-        thankYouMessage =
-        "Thank you, your answers were recorded to '" + RuntimeConfig.getConfigFile() + "'\n\n"
-        + "You can modify this file directly to tweak more options";
-    logger.info(thankYouMessage);
-    System.out.println(thankYouMessage);
-
-    defaultConfig.writeToDisk(RuntimeConfig.getConfigFile());
-    if (!defaultConfig.getAutoStartHub()) { //For now let's not store hub's config in central repo
-      askToStoreConfigsOnHub(defaultConfig, hubHost);
-    }
-
-    return defaultConfig;
-  }
-
-  private static void askToRecordVideo(Config defaultConfig) {
-    String answer = askQuestion("Should this Node record test runs? (1-yes/0-no)", "1");
-
-    if (answer.equals("1")) {
-      logger.info("Setting node to record videos");
-
-      answer =
-          askQuestion("How many videos should node keep in threads?",
-                      String.valueOf(DefaultConfig.VIDEOS_TO_KEEP));
-
-      logger.info("Will keep " + answer + " videos");
-      if (!answer.equals("10")) {
-        //10 is default, so if we are going with that, no reason to keep it explicitly
-        defaultConfig.initializeVideoRecorder();
-        defaultConfig.getVideoRecording().setVideosToKeep(Integer.valueOf(answer));
-      }
-    } else {
-      logger.info("This node will not record test videos");
-      defaultConfig.initializeVideoRecorder();
-      defaultConfig.getVideoRecording().setRecordTestVideos(false);
-    }
-
-  }
-
-  private static void askToStoreConfigsOnHub(Config defaultConfig, String hubHost) {
-    String
-        answer =
-        askQuestion(
-            "Should we store all of these configs in central location on the HUB node and update from there? (1-yes/0-no)",
-            "1");
-
-    if (answer.equals("1")) {
-
-      saveCentralStorageUrl("http://" + hubHost + ":3000/");
-
-      ConfigPusher pusher = new ConfigPusher();
-      pusher.setHubHost(hubHost);
-      pusher.addConfigFile("selenium_grid_extras_config.json");
-
-      logger.info("Sending config files to " + hubHost);
-      for (String file : defaultConfig.getNodeConfigFiles()) {
-        pusher.addConfigFile(file);
-      }
-
-      logger.info("Open transfer");
-      Map<String, Integer> results = pusher.sendAllConfigsToHub();
-      logger.info("Checking status of transfered files");
-      Boolean failure = false;
-      for (String file : results.keySet()) {
-        logger.info(file + " - " + results.get(file));
-        if (!results.get(file).equals(200)) {
-          failure = true;
+        if (defaultConfig.getDefaultRole().equals("hub")) {
+            configureHub(hubHost, hubPort, defaultConfig);
         }
-      }
 
-      if (failure) {
-        System.out.println(
-            "Not all files were successfully sent to the HUB, please check log for more info");
-      } else {
-        System.out.println(
-            "All files sent to hub, check the 'configs" + RuntimeConfig.getOS().getFileSeparator()
-            + RuntimeConfig.getOS().getHostName()
-            + "' directory to modify the configs for this node in the future");
-      }
+        List<Capability> caps = getCapabilitiesFromUser(defaultConfig);
 
-    }
-  }
+        if (defaultConfig.getAutoStartNode()) {
+            configureNodes(caps, hubHost, hubPort, defaultConfig);
 
-  private static void saveCentralStorageUrl(String url) {
-    File configsDirectory = RuntimeConfig.getConfig().getConfigsDirectory();
-    if (!configsDirectory.exists()) {
-      configsDirectory.mkdir();
-    }
+            List<Capability> appiumCaps = getAppiumCapabilitiesFromUser(defaultConfig);
 
-    File
-        storageUrlFile =
-        new File(configsDirectory.getAbsoluteFile() + RuntimeConfig.getOS().getFileSeparator()
-                 + RuntimeConfig.getConfig().getCentralConfigFileName());
+            if (appiumCaps.size() > 0) {
+                String appiumStartCommand = getAppiumStartCommand();
 
-    try {
-      logger.info("Saving the central config url '" + url + "' to file " + storageUrlFile
-          .getAbsolutePath());
-      FileIOUtility.writeToFile(storageUrlFile, url);
-    } catch (IOException error) {
-      String
-          message =
-          "Unable to save the central config repository URL to '" + storageUrlFile
-          + "' please update that file to allow the nodes to automatically self update in the future";
-      System.out.println(message);
-      logger.warn(message);
-      logger.warn(error);
-    }
+                configureAppiumNodes(appiumCaps, hubHost, hubPort, appiumStartCommand, defaultConfig);
+            }
+        }
 
-  }
+        setLogMaximumDaysToKeep(defaultConfig);
 
-  private static void setRebootAfterSessionLimit(Config defaultConfig) {
+        setRebootAfterSessionLimit(defaultConfig);
 
-    if (!defaultConfig.getAutoStartHub()) { // If this is a HUB, we never want to restart it
-      String
-          answer =
-          askQuestion("Restart after how many tests (0-never restart)", "10");
+        setDriverAutoUpdater(defaultConfig);
 
-      defaultConfig.setRebootAfterSessions(answer);
+        setAutoUpdateGridExtras(defaultConfig);
+
+        if (defaultConfig.getAutoStartNode()) {
+            askToRecordVideo(defaultConfig);
+        }
+
+
+        final
+        String
+                thankYouMessage =
+                "Thank you, your answers were recorded to '" + RuntimeConfig.getConfigFile() + "'\n\n"
+                        + "You can modify this file directly to tweak more options";
+        logger.info(thankYouMessage);
+        System.out.println(thankYouMessage);
+
+        defaultConfig.writeToDisk(RuntimeConfig.getConfigFile());
+        if (!defaultConfig.getAutoStartHub()) { //For now let's not store hub's config in central repo
+            askToStoreConfigsOnHub(defaultConfig, hubHost);
+        }
+
+        return defaultConfig;
     }
 
-  }
+    private static void setAutoUpdateGridExtras(Config defaultConfig) {
+        String answer = askQuestion("Would you like Selenium Grid Extras to auto update? (1-yes/0-no)", "0");
 
-  private static void setDriverAutoUpdater(Config defaultConfig) {
-    String
-        answer =
-        askQuestion(
-            "Would you like WebDriver, IEDriver and ChromeDriver to auto update (1-yes/0-no)", "1");
+        if (answer.equals("1")) {
+            defaultConfig.setGridExtrasAutoUpdate(true);
+        } else {
+            defaultConfig.setGridExtrasAutoUpdate(false);
+            String message = String.format("You have chosen to not auto update Grid Extras, " +
+                    "you can update Grid Extras manually by visiting http://%s:3000%s",
+                    RuntimeConfig.getOS().getHostIp(),
+                    TaskDescriptions.Endpoints.UPGRADE_GRID_EXTRAS);
 
-    WebDriverReleaseManager manager = RuntimeConfig.getReleaseManager();
-    String versionOfChrome = manager.getChromeDriverLatestVersion().getPrettyPrintVersion(".");
-    String versionOfWebDriver = manager.getWedriverLatestVersion().getPrettyPrintVersion(".");
-    String versionOfIEDriver = manager.getIeDriverLatestVersion().getPrettyPrintVersion(".");
+            System.out.println(message);
+            logger.info(message);
+        }
 
-    if (answer.equals("1")) {
-      defaultConfig.setAutoUpdateDrivers("1");
-
-    } else {
-      defaultConfig.setAutoUpdateDrivers("0");
-      System.out.println(
-          "Drivers will not be automatically updated.\n You can change the versions of each driver later in the config");
-
-      versionOfWebDriver =
-          askQuestion("What version of WebDriver Jar should we use?", versionOfWebDriver);
-      versionOfChrome =
-          askQuestion("What version of Chrome Driver should we use?", versionOfChrome);
-      versionOfIEDriver =
-          askQuestion("What version of IE Driver should we use?", versionOfIEDriver);
     }
 
-    defaultConfig.getWebdriver().setVersion(versionOfWebDriver);
-    defaultConfig.getIEdriver().setVersion(versionOfIEDriver);
-    defaultConfig.getChromeDriver().setVersion(versionOfChrome);
 
-    System.out
-        .println("Current Selenium Driver Version: " + defaultConfig.getWebdriver().getVersion());
-    System.out.println("Current IE Driver Version: " + defaultConfig.getIEdriver().getVersion());
-    System.out
-        .println("Current Chrome Driver Version: " + defaultConfig.getChromeDriver().getVersion());
+    private static void askToRecordVideo(Config defaultConfig) {
+        String answer = askQuestion("Should this Node record test runs? (1-yes/0-no)", "1");
 
-  }
+        if (answer.equals("1")) {
+            logger.info("Setting node to record videos");
 
-  private static void configureNodes(List<Capability> capabilities, String hubHost,
-                                     String hubPort, Config defaultConfig) {
-    GridNode node = new GridNode();
-    int nodePort = 5555;
+            answer =
+                    askQuestion("How many videos should node keep in threads?",
+                            String.valueOf(DefaultConfig.VIDEOS_TO_KEEP));
 
-    node.getConfiguration().setHubHost(hubHost);
-    node.getConfiguration().setHubPort(Integer.parseInt(hubPort));
-    node.getConfiguration().setPort(nodePort);
+            logger.info("Will keep " + answer + " videos");
+            if (!answer.equals("10")) {
+                //10 is default, so if we are going with that, no reason to keep it explicitly
+                defaultConfig.initializeVideoRecorder();
+                defaultConfig.getVideoRecording().setVideosToKeep(Integer.valueOf(answer));
+            }
+        } else {
+            logger.info("This node will not record test videos");
+            defaultConfig.initializeVideoRecorder();
+            defaultConfig.getVideoRecording().setRecordTestVideos(false);
+        }
 
-    for (Capability cap : capabilities) {
-      node.getCapabilities().add(cap);
     }
 
-    String configFileName = "node_" + nodePort + ".json";
+    private static void askToStoreConfigsOnHub(Config defaultConfig, String hubHost) {
+        String
+                answer =
+                askQuestion(
+                        "Should we store all of these configs in central location on the HUB node and update from there? (1-yes/0-no)",
+                        "1");
 
-    node.writeToFile(configFileName);
-    defaultConfig.addNode(node, configFileName);
-  }
+        if (answer.equals("1")) {
 
-  private static void configureAppiumNodes(List<Capability> capabilities, String hubHost,
-                                           String hubPort, String appiumStartCommand, Config defaultConfig) {
-    GridNode node = new GridNode();
-    int nodePort = 4723;
-    String nodeIp = new OS().getHostIp();
-    String nodeUrl = "http://" + nodeIp + ":" + nodePort + "/wd/hub";
-    int registerCycle = 5000;
+            saveCentralStorageUrl(String.format("http://%s:%s/", hubHost, RuntimeConfig.getGridExtrasPort()));
 
-    node.getConfiguration().setMaxSession(1);
-    node.getConfiguration().setHubHost(hubHost);
-    node.getConfiguration().setHubPort(Integer.parseInt(hubPort));
-    node.getConfiguration().setPort(nodePort);
-    node.getConfiguration().setHost(nodeIp);
-    node.getConfiguration().setUrl(nodeUrl);
-    node.getConfiguration().setRegisterCycle(registerCycle);
-    node.getConfiguration().setAppiumStartCommand(appiumStartCommand);
+            ConfigPusher pusher = new ConfigPusher();
+            pusher.setHubHost(hubHost);
+            pusher.addConfigFile(RuntimeConfig.configFile);
 
-    for (Capability cap : capabilities) {
-      node.getCapabilities().add(cap);
+            logger.info("Sending config files to " + hubHost);
+            for (String file : defaultConfig.getNodeConfigFiles()) {
+                pusher.addConfigFile(file);
+            }
+
+            logger.info("Open transfer");
+            Map<String, Integer> results = pusher.sendAllConfigsToHub();
+            logger.info("Checking status of transfered files");
+            Boolean failure = false;
+            for (String file : results.keySet()) {
+                logger.info(file + " - " + results.get(file));
+                if (!results.get(file).equals(200)) {
+                    failure = true;
+                }
+            }
+
+            if (failure) {
+                System.out.println(
+                        "Not all files were successfully sent to the HUB, please check log for more info");
+            } else {
+                System.out.println(
+                        "All files sent to hub, check the 'configs" + RuntimeConfig.getOS().getFileSeparator()
+                                + RuntimeConfig.getOS().getHostName()
+                                + "' directory to modify the configs for this node in the future");
+            }
+
+        }
     }
 
-    String configFileName = "appium_node_" + nodePort + ".json";
+    private static void saveCentralStorageUrl(String url) {
+        File configsDirectory = RuntimeConfig.getConfig().getConfigsDirectory();
+        if (!configsDirectory.exists()) {
+            configsDirectory.mkdir();
+        }
 
-    node.writeToFile(configFileName);
-    defaultConfig.addNode(node, configFileName);
-  }
+        File
+                storageUrlFile =
+                new File(configsDirectory.getAbsoluteFile() + RuntimeConfig.getOS().getFileSeparator()
+                        + RuntimeConfig.getConfig().getCentralConfigFileName());
 
-  private static void configureHub(String host, String port,
-                                   Config defaultConfig) {
-    GridHub hub = new GridHub();
+        try {
+            logger.info("Saving the central config url '" + url + "' to file " + storageUrlFile
+                    .getAbsolutePath());
+            FileIOUtility.writeToFile(storageUrlFile, url);
+        } catch (IOException error) {
+            String
+                    message =
+                    "Unable to save the central config repository URL to '" + storageUrlFile
+                            + "' please update that file to allow the nodes to automatically self update in the future";
+            System.out.println(message);
+            logger.warn(message);
+            logger.warn(error);
+        }
+
+    }
+
+    private static void setLogMaximumDaysToKeep(Config defaultConfig) {
+        String answer = askQuestion("Maximum days to keep log file", "10");
+        defaultConfig.setLogMaximumAge(ValueConverter.daysToMilliseconds(Integer.valueOf(answer)));
+    }
+
+    private static void setRebootAfterSessionLimit(Config defaultConfig) {
+
+        if (!defaultConfig.getAutoStartHub()) { // If this is a HUB, we never want to restart it
+            String
+                    answer =
+                    askQuestion("Restart after how many tests (0-never restart)", "10");
+
+            defaultConfig.setRebootAfterSessions(answer);
+        }
+
+    }
+
+    private static void setDriverAutoUpdater(Config defaultConfig) {
+        String
+                answer =
+                askQuestion(
+                        "Would you like WebDriver, IEDriver and ChromeDriver to auto update (1-yes/0-no)", "1");
+
+        WebDriverReleaseManager manager = RuntimeConfig.getReleaseManager();
+        String versionOfChrome = manager.getChromeDriverLatestVersion().getPrettyPrintVersion(".");
+        String versionOfWebDriver = manager.getWedriverLatestVersion().getPrettyPrintVersion(".");
+        String versionOfIEDriver = manager.getIeDriverLatestVersion().getPrettyPrintVersion(".");
+
+        if (answer.equals("1")) {
+            defaultConfig.setAutoUpdateDrivers("1");
+
+        } else {
+            defaultConfig.setAutoUpdateDrivers("0");
+            System.out.println(
+                    "Drivers will not be automatically updated.\n You can change the versions of each driver later in the config");
+
+            versionOfWebDriver =
+                    askQuestion("What version of WebDriver Jar should we use?", versionOfWebDriver);
+            versionOfChrome =
+                    askQuestion("What version of Chrome Driver should we use?", versionOfChrome);
+            versionOfIEDriver =
+                    askQuestion("What version of IE Driver should we use?", versionOfIEDriver);
+        }
+
+        defaultConfig.getWebdriver().setVersion(versionOfWebDriver);
+        defaultConfig.getIEdriver().setVersion(versionOfIEDriver);
+        defaultConfig.getChromeDriver().setVersion(versionOfChrome);
+
+        System.out
+                .println("Current Selenium Driver Version: " + defaultConfig.getWebdriver().getVersion());
+        System.out.println("Current IE Driver Version: " + defaultConfig.getIEdriver().getVersion());
+        System.out
+                .println("Current Chrome Driver Version: " + defaultConfig.getChromeDriver().getVersion());
+
+    }
+
+    private static void configureNodes(List<Capability> capabilities, String hubHost,
+                                       String hubPort, Config defaultConfig) {
+        GridNode node = new GridNode();
+        int nodePort = 5555;
+
+        node.getConfiguration().setHubHost(hubHost);
+        node.getConfiguration().setHubPort(Integer.parseInt(hubPort));
+        node.getConfiguration().setPort(nodePort);
+
+        for (Capability cap : capabilities) {
+            node.getCapabilities().add(cap);
+        }
+
+        String configFileName = "node_" + nodePort + ".json";
+
+        node.writeToFile(configFileName);
+        defaultConfig.addNode(node, configFileName);
+    }
+
+    private static void configureAppiumNodes(List<Capability> capabilities, String hubHost,
+                                             String hubPort, String appiumStartCommand, Config defaultConfig) {
+        GridNode node = new GridNode();
+        int nodePort = 4723;
+        String nodeIp = new OS().getHostIp();
+        String nodeUrl = "http://" + nodeIp + ":" + nodePort + "/wd/hub";
+        int registerCycle = 5000;
+
+        node.getConfiguration().setMaxSession(1);
+        node.getConfiguration().setHubHost(hubHost);
+        node.getConfiguration().setHubPort(Integer.parseInt(hubPort));
+        node.getConfiguration().setPort(nodePort);
+        node.getConfiguration().setHost(nodeIp);
+        node.getConfiguration().setUrl(nodeUrl);
+        node.getConfiguration().setRegisterCycle(registerCycle);
+        node.getConfiguration().setAppiumStartCommand(appiumStartCommand);
+
+        for (Capability cap : capabilities) {
+            node.getCapabilities().add(cap);
+        }
+
+        String configFileName = "appium_node_" + nodePort + ".json";
+
+        node.writeToFile(configFileName);
+        defaultConfig.addNode(node, configFileName);
+    }
+
+    private static void configureHub(String host, String port,
+                                     Config defaultConfig) {
+        GridHub hub = new GridHub();
 
 //    hub.getConfiguration().setHost(host); // Should this always be null ?
-    hub.getConfiguration().setPort(Integer.parseInt(port));
+        hub.getConfiguration().setPort(Integer.parseInt(port));
 
-    String configFileName = "hub_" + port + ".json";
+        String configFileName = "hub_" + port + ".json";
 
-    hub.writeToFile(configFileName);
-    defaultConfig.addHub(hub, configFileName);
-  }
+        hub.writeToFile(configFileName);
+        defaultConfig.addHub(hub, configFileName);
+    }
 
 
-  private static List<Capability> getCapabilitiesFromUser(Config defaultConfig) {
+    private static List<Capability> getCapabilitiesFromUser(Config defaultConfig) {
 
-    List<Capability> chosenCapabilities = new LinkedList<Capability>();
+        List<Capability> chosenCapabilities = new LinkedList<Capability>();
 
-    if (defaultConfig.getAutoStartNode()) {
+        if (defaultConfig.getAutoStartNode()) {
 
-      String guessedPlatform = guessPlatform();
-      System.out.println("What is node Platform? (WINDOWS|XP|VISTA|WIN8|WIN8_1|MAC|LINUX|UNIX|ANDROID)");
-      if (guessedPlatform.equals("WINDOWS")){
-        System.out.println("WARNING: We had a hard time guessing your platform accurately so will default to 'WINDOWS' pleas update this to be more accurate, or the grid capability matcher might not function properly");
-      }
-      String platform = askQuestion(
-          "",
-          guessedPlatform);
+            String guessedPlatform = guessPlatform();
+            System.out.println("What is node Platform? (WINDOWS|XP|VISTA|WIN8|WIN8_1|MAC|LINUX|UNIX|ANDROID)");
+            if (guessedPlatform.equals("WINDOWS")) {
+                System.out.println("WARNING: We had a hard time guessing your platform accurately so will default to 'WINDOWS' pleas update this to be more accurate, or the grid capability matcher might not function properly");
+            }
+            String platform = askQuestion(
+                    "",
+                    guessedPlatform);
 
 
       /* If we can't detect the correct browser version, default to No for auto updating the 
        * browser version automatically on node startup */
-      String ableToAutoDetectBrowserVersions = "1";
-      for (Class currentCapabilityClass : Capability.getSupportedWebCapabilities().keySet()) {
+            String ableToAutoDetectBrowserVersions = "1";
+            for (Class currentCapabilityClass : Capability.getSupportedWebCapabilities().keySet()) {
+                String
+                        value =
+                        askQuestion(
+                                "Will this node run '" + currentCapabilityClass.getSimpleName()
+                                        + "' (1-yes/0-no)", "0");
+
+                if (value.equals("1")) {
+                    Capability capability;
+                    try {
+                        capability =
+                                (Capability) Class.forName(currentCapabilityClass.getCanonicalName()).newInstance();
+                        capability.setPlatform(platform.toUpperCase());
+                        String guessedBrowserVersion = BrowserVersionDetector.guessBrowserVersion(currentCapabilityClass.getSimpleName());
+                        String realBrowserVersion = askQuestion(
+                                "What version of '" + currentCapabilityClass.getSimpleName() + "' is installed?", guessedBrowserVersion);
+                        capability.setBrowserVersion(realBrowserVersion);
+                        if ((guessedBrowserVersion != realBrowserVersion) && ableToAutoDetectBrowserVersions.equals("1")) {
+                            ableToAutoDetectBrowserVersions = "0";
+                        }
+
+                        chosenCapabilities.add(capability);
+                    } catch (Exception e) {
+                        logger.warn("Warning: Had an issue creating capability for " + currentCapabilityClass
+                                .getSimpleName());
+                        logger.warn(e.toString());
+                    }
+                }
+
+            }
+
+
+            String answer = askQuestion("Would you like this Node to auto update browser versions? (1-yes/0-no)", ableToAutoDetectBrowserVersions);
+            if (answer.equals("1")) {
+                defaultConfig.setAutoUpdateBrowserVersions("1");
+            } else {
+                defaultConfig.setAutoUpdateBrowserVersions("0");
+            }
+        }
+
+        return chosenCapabilities;
+    }
+
+    private static List<Capability> getAppiumCapabilitiesFromUser(Config defaultConfig) {
+
+        List<Capability> chosenCapabilities = new LinkedList<Capability>();
+
+        if (defaultConfig.getAutoStartNode()) {
+
+            String appium = askQuestion("Will this node run 'Appium' (1-yes/0-no)", "0");
+            if (appium.equals("1")) {
+
+                for (Class currentCapabilityClass : Capability.getSupportedAppiumCapabilities().keySet()) {
+                    String
+                            value =
+                            askQuestion(
+                                    "Will this Appium node run '" + currentCapabilityClass.getSimpleName()
+                                            + "' (1-yes/0-no)", "0");
+
+                    if (value.equals("1")) {
+                        Capability capability;
+                        try {
+                            capability =
+                                    (Capability) Class.forName(currentCapabilityClass.getCanonicalName()).newInstance();
+                            String capabilityName = currentCapabilityClass.getSimpleName();
+                            if (capabilityName.equals("IPhone") || capabilityName.equals("IPad")
+                                    || capabilityName.equals("Safari")) {
+                                capability.setPlatform("MAC");
+                            } else {
+                                capability.setPlatform("ANDROID");
+                            }
+                            capability.setMaxInstances(1);
+                            capability.setBrowserVersion(askQuestion(
+                                    "What version of '" + currentCapabilityClass.getSimpleName() + "' is installed?", ""));
+
+                            chosenCapabilities.add(capability);
+                        } catch (Exception e) {
+                            logger.warn("Warning: Had an issue creating capability for " + currentCapabilityClass
+                                    .getSimpleName());
+                            logger.warn(e.toString());
+                        }
+                    }
+                }
+            }
+        }
+        return chosenCapabilities;
+    }
+
+    private static String guessPlatform() {
+        if (RuntimeConfig.getOS().isWindows()) {
+            String osFamily = new GridPlatform().getWindowsFamily(System.getProperty("os.name"));
+            return osFamily;
+        } else if (RuntimeConfig.getOS().isMac()) {
+            return "MAC";
+        } else {
+            return "LINUX";
+        }
+    }
+
+
+    private static void setGridHubAutostart(Config defaultConfig, String value) {
+        defaultConfig.setAutoStartHub(value);
+    }
+
+    private static void setGridNodeAutostart(Config defaultConfig, String value) {
+        defaultConfig.setAutoStartNode(value);
+    }
+
+    private static String getGridHubHost() {
         String
-            value =
-            askQuestion(
-                "Will this node run '" + currentCapabilityClass.getSimpleName()
-                + "' (1-yes/0-no)", "0");
+                host =
+                askQuestion("What is the HOST for the Selenium Grid Hub?",
+                        "127.0.0.1");
+        return host;
+    }
 
-        if (value.equals("1")) {
-          Capability capability;
-          try {
-            capability =
-                (Capability) Class.forName(currentCapabilityClass.getCanonicalName()).newInstance();
-            capability.setPlatform(platform.toUpperCase());
-            String guessedBrowserVersion = BrowserVersionDetector.guessBrowserVersion(currentCapabilityClass.getSimpleName());
-            String realBrowserVersion = askQuestion(
-                "What version of '" + currentCapabilityClass.getSimpleName() + "' is installed?", guessedBrowserVersion);
-            capability.setBrowserVersion(realBrowserVersion);
-            if ((guessedBrowserVersion != realBrowserVersion) && ableToAutoDetectBrowserVersions.equals("1")) {
-              ableToAutoDetectBrowserVersions = "0";
-            }
 
-            chosenCapabilities.add(capability);
-          } catch (Exception e) {
-            logger.warn("Warning: Had an issue creating capability for " + currentCapabilityClass
-                .getSimpleName());
-            logger.warn(e.toString());
-          }
+    private static String getGridHubPort() {
+        String port = askQuestion("What is the PORT for the Selenium Grid Hub?", "4444");
+        return port;
+    }
+
+    private static String getAppiumStartCommand() {
+        String command = askQuestion("What is the command to start Appium?", "appium");
+        return command;
+    }
+
+    private static void setDefaultService(Config defaultConfig) {
+        String
+                role =
+                askQuestion(
+                        "What is the default Role of this computer? (1 - node | 2 - hub | 3 - hub & node) ",
+                        "1");
+
+        if (role.equals("1")) {
+            setGridHubAutostart(defaultConfig, "0");
+            setGridNodeAutostart(defaultConfig, "1");
+            defaultConfig.setDefaultRole("node");
+        } else if (role.equals("2")) {
+            setGridHubAutostart(defaultConfig, "1");
+            setGridNodeAutostart(defaultConfig, "0");
+            defaultConfig.setDefaultRole("hub");
+        } else {
+            setGridHubAutostart(defaultConfig, "1");
+            setGridNodeAutostart(defaultConfig, "1");
+            defaultConfig.setDefaultRole("hub");
+        }
+    }
+
+    private static String askQuestion(String question, String defaultValue) {
+
+        System.out.println("\n\n" + question);
+        System.out.println("Default Value: " + defaultValue);
+
+        String answer = readLine();
+
+        if (answer.equals("")) {
+            answer = defaultValue;
         }
 
-      }
+        final String printOutAswer = "'" + answer + "' was set as your value";
+        System.out.println(printOutAswer);
+        logger.info(printOutAswer);
 
+        return answer;
 
-      String answer = askQuestion("Would you like this Node to auto update browser versions? (1-yes/0-no)", ableToAutoDetectBrowserVersions);
-      if (answer.equals("1")) {
-        defaultConfig.setAutoUpdateBrowserVersions("1");
-      } else {
-        defaultConfig.setAutoUpdateBrowserVersions("0");
-      }
     }
 
-    return chosenCapabilities;
-  }
+    private static String askQuestion(String question) {
+        System.out.println("\n\n" + question);
+        System.out.println("(No Default Value)");
+        String answer = readLine();
 
-  private static List<Capability> getAppiumCapabilitiesFromUser(Config defaultConfig) {
+        return answer;
+    }
 
-    List<Capability> chosenCapabilities = new LinkedList<Capability>();
+    private static String readLine() {
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        String line = null;
 
-    if (defaultConfig.getAutoStartNode()) {
-
-      String appium = askQuestion("Will this node run 'Appium' (1-yes/0-no)", "0");
-      if (appium.equals("1")) {
-
-        for (Class currentCapabilityClass : Capability.getSupportedAppiumCapabilities().keySet()) {
-          String
-              value =
-              askQuestion(
-                  "Will this Appium node run '" + currentCapabilityClass.getSimpleName()
-                  + "' (1-yes/0-no)", "0");
-
-          if (value.equals("1")) {
-            Capability capability;
-            try {
-              capability =
-                  (Capability) Class.forName(currentCapabilityClass.getCanonicalName()).newInstance();
-              String capabilityName = currentCapabilityClass.getSimpleName();
-              if (capabilityName.equals("IPhone") || capabilityName.equals("IPad")
-                      || capabilityName.equals("Safari")) {
-                capability.setPlatform("MAC");
-              } else {
-                capability.setPlatform("ANDROID");
-              }
-              capability.setMaxInstances(1);
-              capability.setBrowserVersion(askQuestion(
-                "What version of '" + currentCapabilityClass.getSimpleName() + "' is installed?", ""));
-
-              chosenCapabilities.add(capability);
-            } catch (Exception e) {
-              logger.warn("Warning: Had an issue creating capability for " + currentCapabilityClass
-                  .getSimpleName());
-              logger.warn(e.toString());
-            }
-          }
+        try {
+            line = br.readLine();
+        } catch (IOException ioe) {
+            logger.fatal("IO error trying to read your input.");
+            System.exit(1);
         }
-      }
+
+        return line;
     }
-    return chosenCapabilities;
-  }
-
-  private static String guessPlatform() {
-    if (RuntimeConfig.getOS().isWindows()) {
-      String osFamily = new GridPlatform().getWindowsFamily(System.getProperty("os.name"));
-      return osFamily;
-    } else if (RuntimeConfig.getOS().isMac()) {
-      return "MAC";
-    } else {
-      return "LINUX";
-    }
-  }
-
-
-  private static void setGridHubAutostart(Config defaultConfig, String value) {
-    defaultConfig.setAutoStartHub(value);
-  }
-
-  private static void setGridNodeAutostart(Config defaultConfig, String value) {
-    defaultConfig.setAutoStartNode(value);
-  }
-
-  private static String getGridHubHost() {
-    String
-        host =
-        askQuestion("What is the HOST for the Selenium Grid Hub?",
-                    "127.0.0.1");
-    return host;
-  }
-
-
-  private static String getGridHubPort() {
-    String port = askQuestion("What is the PORT for the Selenium Grid Hub?", "4444");
-    return port;
-  }
-
-  private static String getAppiumStartCommand() {
-    String command = askQuestion("What is the command to start Appium?", "appium");
-    return command;
-  }
-
-  private static void setDefaultService(Config defaultConfig) {
-    String
-        role =
-        askQuestion(
-            "What is the default Role of this computer? (1 - node | 2 - hub | 3 - hub & node) ",
-            "1");
-
-    if (role.equals("1")) {
-      setGridHubAutostart(defaultConfig, "0");
-      setGridNodeAutostart(defaultConfig, "1");
-      defaultConfig.setDefaultRole("node");
-    } else if (role.equals("2")) {
-      setGridHubAutostart(defaultConfig, "1");
-      setGridNodeAutostart(defaultConfig, "0");
-      defaultConfig.setDefaultRole("hub");
-    } else {
-      setGridHubAutostart(defaultConfig, "1");
-      setGridNodeAutostart(defaultConfig, "1");
-      defaultConfig.setDefaultRole("hub");
-    }
-  }
-
-  private static String askQuestion(String question, String defaultValue) {
-
-    System.out.println("\n\n" + question);
-    System.out.println("Default Value: " + defaultValue);
-
-    String answer = readLine();
-
-    if (answer.equals("")) {
-      answer = defaultValue;
-    }
-
-    final String printOutAswer = "'" + answer + "' was set as your value";
-    System.out.println(printOutAswer);
-    logger.info(printOutAswer);
-
-    return answer;
-
-  }
-
-  private static String askQuestion(String question) {
-    System.out.println("\n\n" + question);
-    System.out.println("(No Default Value)");
-    String answer = readLine();
-
-    return answer;
-  }
-
-  private static String readLine() {
-    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-    String line = null;
-
-    try {
-      line = br.readLine();
-    } catch (IOException ioe) {
-      logger.fatal("IO error trying to read your input.");
-      System.exit(1);
-    }
-
-    return line;
-  }
 
 }
