@@ -34,66 +34,50 @@
  * Date: 5/10/13
  * Time: 4:06 PM
  */
+
 package com.groupon.seleniumgridextras.tasks;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import com.google.gson.JsonObject;
-
 import com.groupon.seleniumgridextras.config.RuntimeConfig;
-import com.groupon.seleniumgridextras.tasks.config.TaskDescriptions;
-import com.groupon.seleniumgridextras.utilities.TimeStampUtility;
-import org.apache.log4j.Logger;
+import com.groupon.seleniumgridextras.utilities.json.JsonCodec;
 
-public class RebootNode extends ExecuteOSTask {
+import java.util.HashMap;
+import java.util.Map;
 
-    private static Logger logger = Logger.getLogger(RebootNode.class);
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
-    public RebootNode() {
-        setEndpoint(TaskDescriptions.Endpoints.REBOOT);
-        setDescription(TaskDescriptions.Description.REBOOT);
-        JsonObject params = new JsonObject();
-        setAcceptedParams(params);
-        setRequestType("GET");
-        setResponseType("json");
-        setClassname(this.getClass().getCanonicalName().toString());
-        setCssClass(TaskDescriptions.UI.BTN_DANGER);
-        setButtonText(TaskDescriptions.UI.ButtonText.REBOOT);
-        setEnabledInGui(true);
-    }
 
-    @Override
-    public String getWindowsCommand() {
-        return getWindowsCommand("");
-    }
+public class KillPidTest {
 
-    @Override
-    public String getWindowsCommand(String param) {
-        logReboot();
-        return "shutdown -r -t 1 -f";
-    }
+  public KillPid task;
 
-    @Override
-    public String getLinuxCommand() {
-        return getLinuxCommand("");
-    }
+  @Before
+  public void setUp() throws Exception {
+    task = new KillPid();
+  }
 
-    @Override
-    public String getLinuxCommand(String param) {
-        logReboot();
-        return "shutdown -r now";
-    }
+  @After
+  public void tearDown() throws Exception {
 
-    @Override
-    public String getMacCommand() {
-        return getMacCommand("");
-    }
+  }
 
-    @Override
-    public String getMacCommand(String param) {
-        logReboot();
-        return "shutdown -r now";
-    }
+  @Test
+  public void testKillPid() {
+	  Map <String, String> parameter = new HashMap<String, String>();
+	  parameter.put(JsonCodec.OS.KillCommands.ID, "abc");
+	  JsonObject object = task.execute(parameter);
+	  assertNotNull(RuntimeConfig.getOS().getOSName());
+	  if(RuntimeConfig.getOS().isWindows()) {
+		  assertEquals("taskkill -F -IM abc", object.get("command").getAsString());
+	  } else {
+		  assertEquals("kill -9 abc", object.get("command").getAsString());
+	  }
+  }
 
-    protected void logReboot() {
-        logger.info("Rebooting " + RuntimeConfig.getOS().getHostName() + " at " + TimeStampUtility.getTimestampAsString());
-    }
+
 }
