@@ -262,8 +262,15 @@ public class BrowserVersionDetector {
       version = version.substring(0, version.indexOf('.'));
       return version.trim();
     } else if (RuntimeConfig.getOS().isMac()) {
+<<<<<<< HEAD
+      String[] cmd = {"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", " -version"};
+      try {
+        JsonObject object = ExecuteCommand
+                .execRuntime(cmd, true, true);
+=======
       try {
         JsonObject object = ExecuteCommand.execRuntime(chromeMacVersionCommand, true);
+>>>>>>> f9b62d74afc07f0910d96e8f1705df20a6da16bf
         version = object.get("out").getAsString().trim().replaceAll("[^\\d.]", ""); // Removes "Google Chrome"
         version = version.substring(0, version.indexOf('.'));
       } catch (Exception e) {
